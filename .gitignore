@@ -1,0 +1,5 @@
+# Ignore all files except the main setup SQL file
+*
+!.gitignore
+!snowflake intelligence setup.sql
+
