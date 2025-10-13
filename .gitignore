@@ -1,5 +1,3 @@
-# Ignore all files except the main setup SQL file
-*
-!.gitignore
-!snowflake intelligence setup.sql
-
+agent setup of snow docs.sql
+mcp setup of snow docs.sql
+README.md
