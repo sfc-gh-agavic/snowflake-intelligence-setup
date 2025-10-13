@@ -1,0 +1,46 @@
+USE ROLE ACCOUNTADMIN;
+
+ALTER USER USERADMIN ADD PROGRAMMATIC ACCESS TOKEN CURSOR_DOCS
+ROLE_RESTRICTION = 'SNOWFLAKE_DOCS_ROLE'
+DAYS_TO_EXPIRY = 90;
+
+CREATE AUTHENTICATION POLICY my_authentication_policy
+  PAT_POLICY=(
+      DEFAULT_EXPIRY_IN_DAYS=5
+    , NETWORK_POLICY_EVALUATION = NOT_ENFORCED
+  );
+
+ALTER ACCOUNT SET AUTHENTICATION POLICY my_authentication_policy;
+
+
+-- ========================================================
+-- MCP DATABASE - MCP SERVERS AND ROLES FOR SNOWFLAKE DOCS
+-- ========================================================
+
+USE ROLE SYSADMIN;
+
+CREATE DATABASE IF NOT EXISTS MCP;
+
+USE DATABASE MCP;
+
+-- create a schema for our MCP servers
+CREATE SCHEMA IF NOT EXISTS MCP_SERVERS;
+
+-- create mcp server for snowflake docs
+CREATE OR REPLACE MCP SERVER MCP.MCP_SERVERS.SNOWFLAKE_DOCS FROM SPECIFICATION 
+$$
+  tools:
+    - name: "snowflake-docs"
+      type: "CORTEX_SEARCH_SERVICE_QUERY"
+      identifier: "snowflake_docs.shared.cke_snowflake_docs_service"
+      description: "cortex search service for snowflake documentation"
+      title: "Snowflake Docs"
+$$;
+
+-- create restrictive role to just access docs search service
+USE ROLE ACCOUNTADMIN ;
+CREATE ROLE IF NOT EXISTS SNOWFLAKE_DOCS_ROLE;
+GRANT ROLE SNOWFLAKE_DOCS_ROLE TO USER useradmin;  -- ADJUST THIS TO YOUR USERNAME
+GRANT USAGE ON DATABASE MCP TO ROLE SNOWFLAKE_DOCS_ROLE;
+GRANT USAGE ON SCHEMA MCP_SERVERS TO ROLE SNOWFLAKE_DOCS_ROLE;
+GRANT USAGE ON MCP SERVER MCP.MCP_SERVERS.SNOWFLAKE_DOCS TO ROLE SNOWFLAKE_DOCS_ROLE;
