@@ -1,16 +1,24 @@
+-- ========================================================
+-- CREATE AUTHENTICATION POLICY FOR PATs
+-- ========================================================
+
 USE ROLE ACCOUNTADMIN;
 
-ALTER USER USERADMIN ADD PROGRAMMATIC ACCESS TOKEN CURSOR_DOCS
-ROLE_RESTRICTION = 'SNOWFLAKE_DOCS_ROLE'
-DAYS_TO_EXPIRY = 90;
+-- Note: It is recommened to have a strict PAT policy in place for MCP usage, but not required.
+-- This policy is not required for Snowflake Intelligence usage.
 
-CREATE AUTHENTICATION POLICY my_authentication_policy
+-- If this strict policy is used, users can only generate/use PATs for MCP usage, if they have:
+-- Be assigned to a network policy that defines allowed IP ranges or network identifiers
+-- Have the network policy activated for their user account
+
+CREATE AUTHENTICATION POLICY strict_pat_policy
   PAT_POLICY=(
-      DEFAULT_EXPIRY_IN_DAYS=5
-    , NETWORK_POLICY_EVALUATION = NOT_ENFORCED
+    NETWORK_POLICY_EVALUATION = ENFORCED_REQUIRED,
+    DEFAULT_EXPIRY_IN_DAYS = 7,
+    MAX_EXPIRY_IN_DAYS = 30
   );
 
-ALTER ACCOUNT SET AUTHENTICATION POLICY my_authentication_policy;
+ALTER ACCOUNT SET AUTHENTICATION POLICY strict_pat_policy;
 
 
 -- ========================================================
@@ -36,11 +44,46 @@ $$
       description: "cortex search service for snowflake documentation"
       title: "Snowflake Docs"
 $$;
+DESCRIBE MCP SERVER SNOWFLAKE_DOCS;
 
 -- create restrictive role to just access docs search service
-USE ROLE ACCOUNTADMIN ;
-CREATE ROLE IF NOT EXISTS SNOWFLAKE_DOCS_ROLE;
-GRANT ROLE SNOWFLAKE_DOCS_ROLE TO USER useradmin;  -- ADJUST THIS TO YOUR USERNAME
-GRANT USAGE ON DATABASE MCP TO ROLE SNOWFLAKE_DOCS_ROLE;
-GRANT USAGE ON SCHEMA MCP_SERVERS TO ROLE SNOWFLAKE_DOCS_ROLE;
-GRANT USAGE ON MCP SERVER MCP.MCP_SERVERS.SNOWFLAKE_DOCS TO ROLE SNOWFLAKE_DOCS_ROLE;
+USE ROLE SECURITYADMIN ;
+GRANT USAGE ON DATABASE MCP TO ROLE SNOWFLAKE_INTELLIGENCE_USER;
+GRANT USAGE ON SCHEMA MCP_SERVERS TO ROLE SNOWFLAKE_INTELLIGENCE_USER;
+GRANT USAGE ON MCP SERVER MCP.MCP_SERVERS.SNOWFLAKE_DOCS TO ROLE SNOWFLAKE_INTELLIGENCE_USER;
+
+-- create PAT for Snowflake Intelligence user
+ALTER USER <username> ADD PROGRAMMATIC ACCESS TOKEN SNOWFLAKE_DOCS
+ROLE_RESTRICTION = 'SNOWFLAKE_INTELLIGENCE_USER'
+DAYS_TO_EXPIRY = 10;
+
+-- ========================================================
+-- MCP SETUP OF SNOWFLAKE DOCS IN CURSOR
+-- ========================================================
+
+-- Let's install the mcp server into Cursor
+-- In Cursor, open or create ~/.cursor/mcp.json and add the following. 
+-- NOTE: Replace the ORG and PAT placeholders with your values.
+/*
+{
+    "mcpServers": {
+      "snowflake-docs": {
+        "url": "https://<YOUR-ORG-YOUR-ACCOUNT>.snowflakecomputing.com/api/v2/databases/MCP/schemas/MCP_SERVERS/mcp-servers/SNOWFLAKE_DOCS",
+            "headers": {
+              "Authorization": "Bearer <YOUR-PAT-TOKEN>"
+            }
+      }
+    }
+}
+
+ */
+
+
+-- Once saved, you should see snowflake-docs MCP server enabled. (Can be verifed in Cursor Settings > Tools & MCP)
+
+-- Start a new chat in Cursor and set your @mcp.json as context to ask a question!
+-- "What is a MCP server?""
+
+-- Note: You may get a prompt asking you to allow Cursor to use the snowflake-docs MCP server tool.
+
+-- That's it! You can now use the snowflake-docs MCP server in Cursor to ask questions about Snowflake Documentation.
